@@ -1,0 +1,22 @@
+[project]
+name = "werewolf-ai-battle"
+version = "0.1.0"
+description = "Claude Codeで遊ぶ人狼ゲーム。tmuxで複数AIと同時対戦！"
+readme = "README.md"
+requires-python = ">=3.10"
+dependencies = [
+    "websockets>=13.0",
+    "rich>=13.0.0",
+]
+
+[project.scripts]
+werewolf-server = "server.server:main"
+werewolf-godview = "server.godview:main"
+werewolf-client = "server.client:main"
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.uv]
+dev-dependencies = []
