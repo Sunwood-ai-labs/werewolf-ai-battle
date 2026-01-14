@@ -18,5 +18,8 @@ werewolf-client = "server.client:main"
 requires = ["hatchling"]
 build-backend = "hatchling.build"
 
-[tool.uv]
-dev-dependencies = []
+[tool.hatch.build.targets.wheel]
+packages = ["server"]
+
+[dependency-groups]
+dev = []
