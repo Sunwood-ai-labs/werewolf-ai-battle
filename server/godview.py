@@ -34,6 +34,8 @@ class WerewolfGodview:
         }
         self.events = []
         self.current_channel = "public"
+        self.current_phase = "waiting"
+        self.time_remaining = 0
 
     def create_header(self) -> Panel:
         """ヘッダーを作成"""
@@ -42,8 +44,25 @@ class WerewolfGodview:
         header_text.append("WEREWOLF AI BATTLE", style="bold magenta")
         header_text.append(" - Godview", style="dim")
 
+        # フェーズ情報を追加
+        phase_text = Text()
+        phase_names = {
+            "waiting": "待機中",
+            "introduction": "挨拶",
+            "discussion": "議論",
+            "voting": "投票",
+            "werewolf": "人狼",
+            "seer": "占い",
+            "day_end": "朝",
+        }
+        phase_name = phase_names.get(self.current_phase, self.current_phase)
+
+        if self.current_phase != "waiting" and self.time_remaining is not None:
+            phase_text.append(f" | [{phase_name}] ", style="bold yellow")
+            phase_text.append(f"{self.time_remaining}s", style="bold cyan")
+
         return Panel(
-            Align.center(header_text),
+            Align.center(header_text.append(phase_text)),
             style="bold black on magenta",
             height=2,
         )
@@ -108,8 +127,6 @@ class WerewolfGodview:
                 # 役職に応じた色
                 if role == "werewolf":
                     player_style = "red"
-                elif role == "moderator":
-                    player_style = "blue"
                 else:
                     player_style = "cyan"
 
@@ -121,7 +138,7 @@ class WerewolfGodview:
             chat_text,
             title=f"[{self.current_channel}]",
             border_style="magenta",
-            height=40,  # 高さを大きくする
+            height=60,  # 高さを大きくする
         )
 
     def create_event_panel(self) -> Panel:
@@ -181,6 +198,11 @@ class WerewolfGodview:
                 channels_data = data.get("channels", {})
                 for channel_name, channel_info in channels_data.items():
                     self.messages[channel_name] = channel_info.get("messages", [])
+
+                # フェーズ情報を取得
+                self.current_phase = data.get("current_phase", "waiting")
+                self.time_remaining = data.get("time_remaining", 0)
+
                 # デバッグログ
                 self.console.print(f"[dim]プレイヤー数: {len(self.players)}, publicメッセージ数: {len(self.messages.get('public', []))}[/]")
 
@@ -204,6 +226,12 @@ class WerewolfGodview:
                 msg = data.get("message", {})
                 if channel in self.messages:
                     self.messages[channel].append(msg)
+
+                # メッセージからフェーズ情報を更新
+                if "current_phase" in msg:
+                    self.current_phase = msg.get("current_phase", "waiting")
+                if "time_remaining" in msg:
+                    self.time_remaining = msg.get("time_remaining", 0)
 
         except json.JSONDecodeError:
             pass
