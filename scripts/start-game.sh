@@ -17,14 +17,32 @@ echo "プレイヤー数: $PLAYERS"
 # プロジェクトディレクトリを取得（現在のディレクトリを使用）
 PROJECT_DIR="$(pwd)"
 
-# ccd-glm 実行用ディレクトリ
+# ccd-glm 実行用ディレクトリ（ローカル）
 WEREWOLF_DIR="$PROJECT_DIR/werewolf"
+
+# ccd-glm 実行用ディレクトリ（グローバル /werewolf）
+GLOBAL_WEREWOLF_DIR="/werewolf"
 
 # プレイヤーディレクトリがなければセットアップスクリプトを実行
 if [ ! -d "$WEREWOLF_DIR/player1" ]; then
     echo "プレイヤーディレクトリを初期化中..."
     bash "$PROJECT_DIR/scripts/setup-players.sh"
 fi
+
+# /werewolf に werewolf ディレクトリをコピー
+echo "グローバル /werewolf にファイルをコピー中..."
+sudo mkdir -p "$GLOBAL_WEREWOLF_DIR"
+sudo cp -r "$WEREWOLF_DIR"/* "$GLOBAL_WEREWOLF_DIR/"
+sudo chown -R aslan:aslan "$GLOBAL_WEREWOLF_DIR"
+
+# 各プレイヤーディレクトリに README.md をコピー
+echo "各プレイヤーディレクトリに README.md をコピー中..."
+for i in $(seq 1 $PLAYERS); do
+    if [ -f "$PROJECT_DIR/werewolf/README.md" ]; then
+        cp "$PROJECT_DIR/werewolf/README.md" "$GLOBAL_WEREWOLF_DIR/player$i/"
+        echo "  player$i に README.md をコピーしました"
+    fi
+done
 
 # 既存のセッションがあれば削除
 tmux has-session -t $SESSION_NAME 2>/dev/null || true
@@ -48,48 +66,58 @@ echo "ログ: tail -f /tmp/werewolf-server.log"
 # サーバーが起動するのを待つ
 sleep 3
 
-# 新しいセッションを作成（godviewペインから開始）
+# 新しいセッションを作成
 echo "tmuxセッションを作成中: $SESSION_NAME"
 tmux new-session -d -s $SESSION_NAME -n "game"
-tmux send-keys -t $SESSION_NAME:0 "cd '$PROJECT_DIR'" Enter
-tmux send-keys -t $SESSION_NAME:0 "uv run python -m server.godview" Enter
 
-# 縦に2分割して上下を作る
-tmux split-window -v -t $SESSION_NAME:0  # pane 1
-
-# 上の行（pane 0）を横に3分割
+# 2x3のグリッドレイアウトを作成
+tmux split-window -v -t $SESSION_NAME:0.0  # pane 1
 tmux split-window -h -t $SESSION_NAME:0.0  # pane 2
-tmux split-window -h -t $SESSION_NAME:0.0  # pane 3
+tmux split-window -h -t $SESSION_NAME:0.2  # pane 3
 
-# 下の行（pane 1）を横に3分割
-tmux split-window -h -t $SESSION_NAME:0.1  # pane 4
-tmux split-window -h -t $SESSION_NAME:0.1  # pane 5
-
-# 合計6ペイン: pane 0, 2, 3, 1, 4, 5
-# まだgodviewとplayer1-5しかない
+tmux split-window -v -t $SESSION_NAME:0.1  # pane 4
+tmux split-window -h -t $SESSION_NAME:0.4  # pane 5
 
 # tiledレイアウトで均等配置
 tmux select-layout -t $SESSION_NAME:0 tiled
 
-# さらに分割してplayer6用のスペースを作る
-# どれかの大きなペインを分割
-tmux split-window -v -t $SESSION_NAME:0.0
-
 # 各プレイヤーペインにccd-glmを送信して実行
-# godviewはpane 0（ccd-glmは実行しない）
-# プレイヤーペインはpane 1, 2, 3, 4, 5, 6
-for pane in 1 2 3 4 5 6; do
-    tmux send-keys -t $SESSION_NAME:0.$pane "cd '$WEREWOLF_DIR/player$pane'" Enter
-    sleep 1
-    tmux send-keys -t $SESSION_NAME:0.$pane "ccd-glm" Enter
-    sleep 5
-done
+# paneとplayerのマッピング: 0->1, 2->2, 3->3, 1->4, 4->5, 5->6
+tmux send-keys -t $SESSION_NAME:0.0 "cd '$GLOBAL_WEREWOLF_DIR/player1'" Enter
+sleep 1
+tmux send-keys -t $SESSION_NAME:0.0 "ccd-glm" Enter
+sleep 5
+
+tmux send-keys -t $SESSION_NAME:0.2 "cd '$GLOBAL_WEREWOLF_DIR/player2'" Enter
+sleep 1
+tmux send-keys -t $SESSION_NAME:0.2 "ccd-glm" Enter
+sleep 5
+
+tmux send-keys -t $SESSION_NAME:0.3 "cd '$GLOBAL_WEREWOLF_DIR/player3'" Enter
+sleep 1
+tmux send-keys -t $SESSION_NAME:0.3 "ccd-glm" Enter
+sleep 5
+
+tmux send-keys -t $SESSION_NAME:0.1 "cd '$GLOBAL_WEREWOLF_DIR/player4'" Enter
+sleep 1
+tmux send-keys -t $SESSION_NAME:0.1 "ccd-glm" Enter
+sleep 5
+
+tmux send-keys -t $SESSION_NAME:0.4 "cd '$GLOBAL_WEREWOLF_DIR/player5'" Enter
+sleep 1
+tmux send-keys -t $SESSION_NAME:0.4 "ccd-glm" Enter
+sleep 5
+
+tmux send-keys -t $SESSION_NAME:0.5 "cd '$GLOBAL_WEREWOLF_DIR/player6'" Enter
+sleep 1
+tmux send-keys -t $SESSION_NAME:0.5 "ccd-glm" Enter
+sleep 5
 
 # 各プレイヤーに役割を割り当て（Enterを押す）
 # CLAUDE.md で設定された名前と口調は保持したまま、役職のみを伝える
 
-# プレイヤー1（pane 1）- 村人1
-tmux send-keys -t $SESSION_NAME:0.1 "【システム通知】あなたは人狼ゲームの「村人」です。他のプレイヤーと協力して人狼を見つけ出してください。まず自己紹介をしてください。" Enter
+# プレイヤー1（pane 0）- 村人1
+tmux send-keys -t $SESSION_NAME:0.0 "【システム通知】あなたは人狼ゲームの「村人」です。他のプレイヤーと協力して人狼を見つけ出してください。まず自己紹介をしてください。" Enter
 sleep 1
 
 # プレイヤー2（pane 2）- 人狼1
@@ -100,29 +128,31 @@ sleep 1
 tmux send-keys -t $SESSION_NAME:0.3 "【システム通知】あなたは人狼ゲームの「占い師」です。夜に誰か1人の正体を占います。まず自己紹介をしてください。" Enter
 sleep 1
 
-# プレイヤー4（pane 4）- 霊媒師
-tmux send-keys -t $SESSION_NAME:0.4 "【システム通知】あなたは人狼ゲームの「霊媒師」です。処刑された人の正体を確認できます。まず自己紹介をしてください。" Enter
+# プレイヤー4（pane 1）- 霊媒師
+tmux send-keys -t $SESSION_NAME:0.1 "【システム通知】あなたは人狼ゲームの「霊媒師」です。処刑された人の正体を確認できます。まず自己紹介をしてください。" Enter
 sleep 1
 
-# プレイヤー5（pane 5）- 人狼2
-tmux send-keys -t $SESSION_NAME:0.5 "【システム通知】あなたは人狼ゲームの「人狼」です。村人のふりをして、誰も気づかないようにしてください。まず自己紹介をしてください。" Enter
+# プレイヤー5（pane 4）- 人狼2
+tmux send-keys -t $SESSION_NAME:0.4 "【システム通知】あなたは人狼ゲームの「人狼」です。村人のふりをして、誰も気づかないようにしてください。まず自己紹介をしてください。" Enter
 sleep 1
 
-# プレイヤー6（pane 6）- GM
-tmux send-keys -t $SESSION_NAME:0.6 "【システム通知】あなたは人狼ゲームの「ゲームマスター」です。ゲームを進行してください。まずプレイヤー全員に挨拶をして、ゲームの説明をしてください。" Enter
+# プレイヤー6（pane 5）- GM
+tmux send-keys -t $SESSION_NAME:0.5 "【システム通知】あなたは人狼ゲームの「ゲームマスター」です。ゲームを進行してください。まずプレイヤー全員に挨拶をして、ゲームの説明をしてください。" Enter
 sleep 1
 
 echo ""
 echo "✅ ゲームが開始されました！"
 echo ""
-echo "レイアウト:"
+echo "レイアウト（tmux）:"
 echo "  +----------+----------+----------+"
-echo "  | godview  | player1  | player2  |"
+echo "  | player1  | player2  | player3  |"
 echo "  +----------+----------+----------+"
-echo "  | player3  | player4  | player5  |"
+echo "  | player4  | player5  | player6  |"
 echo "  +----------+----------+----------+"
-echo "  | player6  |          |          |"
-echo "  +----------+----------+----------+"
+echo ""
+echo "🔍 神視点（別端末で起動）:"
+echo "  cd $PROJECT_DIR"
+echo "  uv run python -m server.godview"
 echo ""
 echo "次のコマンドでゲームに参加できます:"
 echo "  tmux attach -t $SESSION_NAME"
