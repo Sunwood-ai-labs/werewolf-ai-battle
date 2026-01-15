@@ -91,3 +91,5 @@ dmypy.json
 
 # Distribution / packaging
 *.whl
+.SourceSageAssets/DOCUMIND/Repository_summary.md
+uv.lock
