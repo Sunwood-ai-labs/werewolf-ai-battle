@@ -176,6 +176,11 @@ class WerewolfGodview:
             if data.get("type") == "init":
                 # 初期データ
                 self.players = data.get("players", [])
+                channels_data = data.get("channels", {})
+                for channel_name, channel_info in channels_data.items():
+                    self.messages[channel_name] = channel_info.get("messages", [])
+                # デバッグログ
+                self.console.print(f"[dim]プレイヤー数: {len(self.players)}, publicメッセージ数: {len(self.messages.get('public', []))}[/]")
 
             elif data.get("type") == "player_joined":
                 # プレイヤー参加
@@ -215,9 +220,10 @@ class WerewolfGodview:
                 self.console.print("[bold green]✅ 接続成功！[/]")
 
                 # Live Display開始
-                with Live(self.create_layout(), console=self.console, refresh_per_second=10):
+                with Live(console=self.console, refresh_per_second=10) as live:
                     async for message in websocket:
                         await self.handle_message(message)
+                        live.update(self.create_layout())
 
         except ConnectionRefusedError:
             self.console.print(
