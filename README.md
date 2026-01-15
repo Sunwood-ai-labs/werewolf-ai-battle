@@ -132,6 +132,18 @@ uv run python -m server.godview
 - **チャットログ**: 全チャンネルの会話をリアルタイム表示
 - **イベントログ**: プレイヤーの参加/退出などを記録
 
+### websocat で最新チャットを確認
+
+```bash
+# 最新5件のチャットを確認（パスワード: wolf）
+echo '{"type":"godview","password":"wolf"}' | websocat ws://localhost:8765 | jq '.channels.public.messages[-5:]'
+
+# プレイヤー一覧を確認
+echo '{"type":"godview","password":"wolf"}' | websocat ws://localhost:8765 | jq '.players'
+```
+
+> **注意**: 神視点にはパスワード `wolf` が必要です。プレイヤーには知らせないでください。
+
 ---
 
 ## ゲームルール

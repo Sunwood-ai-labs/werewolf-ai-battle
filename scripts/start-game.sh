@@ -53,7 +53,7 @@ fi
 
 # チャットサーバーのプロセスがあれば停止
 sudo -u aslan pkill -f "python.*server.server" 2>/dev/null || true
-sleep 1
+sleep 0.3
 
 # サーバーを裏で起動
 echo "チャットサーバーを裏で起動中..."
@@ -64,7 +64,7 @@ echo "サーバーPID: $SERVER_PID"
 echo "ログ: tail -f /tmp/werewolf-server.log"
 
 # サーバーが起動するのを待つ
-sleep 3
+sleep 0.3
 
 # 新しいセッションを作成
 echo "tmuxセッションを作成中: $SESSION_NAME"
@@ -84,61 +84,61 @@ tmux select-layout -t $SESSION_NAME:0 tiled
 # 各プレイヤーペインにccd-glmを送信して実行
 # paneとplayerのマッピング: 0->1, 2->2, 3->3, 1->4, 4->5, 5->6
 tmux send-keys -t $SESSION_NAME:0.0 "cd '$GLOBAL_WEREWOLF_DIR/player1'" Enter
-sleep 1
+sleep 0.3
 tmux send-keys -t $SESSION_NAME:0.0 "ccd-glm" Enter
-sleep 5
+sleep 0.3
 
 tmux send-keys -t $SESSION_NAME:0.2 "cd '$GLOBAL_WEREWOLF_DIR/player2'" Enter
-sleep 1
+sleep 0.3
 tmux send-keys -t $SESSION_NAME:0.2 "ccd-glm" Enter
-sleep 5
+sleep 0.3
 
 tmux send-keys -t $SESSION_NAME:0.3 "cd '$GLOBAL_WEREWOLF_DIR/player3'" Enter
-sleep 1
+sleep 0.3
 tmux send-keys -t $SESSION_NAME:0.3 "ccd-glm" Enter
-sleep 5
+sleep 0.3
 
 tmux send-keys -t $SESSION_NAME:0.1 "cd '$GLOBAL_WEREWOLF_DIR/player4'" Enter
-sleep 1
+sleep 0.3
 tmux send-keys -t $SESSION_NAME:0.1 "ccd-glm" Enter
-sleep 5
+sleep 0.3
 
 tmux send-keys -t $SESSION_NAME:0.4 "cd '$GLOBAL_WEREWOLF_DIR/player5'" Enter
-sleep 1
+sleep 0.3
 tmux send-keys -t $SESSION_NAME:0.4 "ccd-glm" Enter
-sleep 5
+sleep 0.3
 
 tmux send-keys -t $SESSION_NAME:0.5 "cd '$GLOBAL_WEREWOLF_DIR/player6'" Enter
-sleep 1
+sleep 0.3
 tmux send-keys -t $SESSION_NAME:0.5 "ccd-glm" Enter
-sleep 5
+sleep 0.3
 
 # 各プレイヤーに役割を割り当て（Enterを押す）
 # CLAUDE.md で設定された名前と口調は保持したまま、役職のみを伝える
 
 # プレイヤー1（pane 0）- 村人1
 tmux send-keys -t $SESSION_NAME:0.0 "【システム通知】あなたは人狼ゲームの「村人」です。まずREADME.mdのゲームルールを確認してください。その後、他のプレイヤーと協力して人狼を見つけ出してください。まず自己紹介をしてください。" Enter
-sleep 1
+sleep 0.3
 
 # プレイヤー2（pane 2）- 人狼1
 tmux send-keys -t $SESSION_NAME:0.2 "【システム通知】あなたは人狼ゲームの「人狼」です。まずREADME.mdのゲームルールを確認してください。その後、村人のふりをして、誰も気づかないようにしてください。まず自己紹介をしてください。" Enter
-sleep 1
+sleep 0.3
 
 # プレイヤー3（pane 3）- 占い師
 tmux send-keys -t $SESSION_NAME:0.3 "【システム通知】あなたは人狼ゲームの「占い師」です。まずREADME.mdのゲームルールを確認してください。その後、夜に誰か1人の正体を占います。まず自己紹介をしてください。" Enter
-sleep 1
+sleep 0.3
 
 # プレイヤー4（pane 1）- 霊媒師
 tmux send-keys -t $SESSION_NAME:0.1 "【システム通知】あなたは人狼ゲームの「霊媒師」です。まずREADME.mdのゲームルールを確認してください。その後、処刑された人の正体を確認できます。まず自己紹介をしてください。" Enter
-sleep 1
+sleep 0.3
 
 # プレイヤー5（pane 4）- 人狼2
 tmux send-keys -t $SESSION_NAME:0.4 "【システム通知】あなたは人狼ゲームの「人狼」です。まずREADME.mdのゲームルールを確認してください。その後、村人のふりをして、誰も気づかないようにしてください。まず自己紹介をしてください。" Enter
-sleep 1
+sleep 0.3
 
 # プレイヤー6（pane 5）- GM
 tmux send-keys -t $SESSION_NAME:0.5 "【システム通知】あなたは人狼ゲームの「ゲームマスター」です。まずREADME.mdのゲームルールを確認してください。その後、ゲームを進行してください。まずプレイヤー全員に挨拶をして、ゲームの説明をしてください。" Enter
-sleep 1
+sleep 0.3
 
 echo ""
 echo "✅ ゲームが開始されました！"

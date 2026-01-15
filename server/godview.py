@@ -45,7 +45,7 @@ class WerewolfGodview:
         return Panel(
             Align.center(header_text),
             style="bold black on magenta",
-            height=3,
+            height=2,
         )
 
     def create_player_table(self) -> Table:
@@ -95,9 +95,11 @@ class WerewolfGodview:
             )
         else:
             chat_text = Text()
-            chat_text.append(f"チャンネル: {self.current_channel}\n\n", style="bold")
+            # 最新20件を表示（最新が下に来る）
+            display_messages = messages[-20:]
+            chat_text.append(f"チャンネル: {self.current_channel}  (最新{len(display_messages)}件)\n\n", style="bold dim")
 
-            for msg in messages[-15:]:  # 最新15件を表示
+            for msg in display_messages:
                 timestamp = msg.get("timestamp", "")[-8:]
                 player = msg.get("player", "Unknown")
                 role = msg.get("role", "unknown")
@@ -119,7 +121,7 @@ class WerewolfGodview:
             chat_text,
             title=f"[{self.current_channel}]",
             border_style="magenta",
-            height=20,
+            height=40,  # 高さを大きくする
         )
 
     def create_event_panel(self) -> Panel:
@@ -128,7 +130,7 @@ class WerewolfGodview:
             event_text = Text("イベントはありません", style="dim")
         else:
             event_text = Text()
-            for event in self.events[-5:]:  # 最新5件
+            for event in self.events[-3:]:  # 最新3件
                 event_type = event.get("type", "")
                 event_str = f"[{datetime.now().strftime('%H:%M:%S')}] {event_type}"
                 event_text.append(event_str + "\n")
@@ -137,7 +139,7 @@ class WerewolfGodview:
             event_text,
             title="イベントログ",
             border_style="yellow",
-            height=8,
+            height=5,
         )
 
     def create_layout(self) -> Layout:
@@ -145,9 +147,9 @@ class WerewolfGodview:
         layout = Layout()
 
         layout.split_column(
-            Layout(name="header", size=3),
+            Layout(name="header", size=2),
             Layout(name="main"),
-            Layout(name="events", size=8),
+            Layout(name="events", size=3),  # イベントログを小さく
         )
 
         layout["main"].split_row(
@@ -214,10 +216,11 @@ class WerewolfGodview:
 
         try:
             async with websockets.connect(self.server_url) as websocket:
-                # 神視点として登録
-                await websocket.send(json.dumps({"type": "godview"}))
+                # 神視点として登録（パスワード付き）
+                await websocket.send(json.dumps({"type": "godview", "password": "wolf"}))
 
                 self.console.print("[bold green]✅ 接続成功！[/]")
+                self.console.print("[dim]Ctrl+C で終了[/]")
 
                 # Live Display開始
                 with Live(console=self.console, refresh_per_second=10) as live:
