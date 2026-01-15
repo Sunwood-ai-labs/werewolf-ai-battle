@@ -68,6 +68,24 @@ class WerewolfClient:
             }
             await self.websocket.send(json.dumps(message))
 
+    async def get_time_remaining(self) -> dict:
+        """残り時間と現在のフェーズを取得"""
+        if self.websocket:
+            message = {
+                "type": "get_time_remaining",
+            }
+            await self.websocket.send(json.dumps(message))
+
+    async def get_history(self, channel: str = "public", count: int = 10) -> dict:
+        """過去ログを取得"""
+        if self.websocket:
+            message = {
+                "type": "get_history",
+                "channel": channel,
+                "count": count,
+            }
+            await self.websocket.send(json.dumps(message))
+
     async def close(self):
         """接続を閉じる"""
         if self.websocket:
