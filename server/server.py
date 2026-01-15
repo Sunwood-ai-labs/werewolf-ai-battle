@@ -60,9 +60,28 @@ class WerewolfServer:
         self.channels: Dict[str, ChatChannel] = {
             "public": ChatChannel("public", "全員が見れるチャンネル"),
             "werewolf": ChatChannel("werewolf", "人狼だけのチャンネル"),
-            "moderator": ChatChannel("moderator", "ゲームマスター用チャンネル"),
         }
         self.godview_clients: Set = set()
+
+        # ゲーム状態管理
+        self.game_phase = "waiting"  # waiting, introduction, discussion, voting, werewolf, seer, day_end
+        self.phase_start_time = None
+        self.phase_duration = 0
+        self.phase_timer_task = None
+
+        # フェーズ時間（秒）
+        self.phase_durations = {
+            "introduction": 60,
+            "discussion": 60,
+            "voting": 20,
+            "werewolf": 20,
+            "seer": 20,
+        }
+
+        # ゲームデータ
+        self.vote_results = {}
+        self.attack_target = None
+        self.divine_target = None
 
     async def register_player(
         self, websocket, player_id: str, name: str, role: str = "villager"
@@ -109,6 +128,7 @@ class WerewolfServer:
             {
                 "type": "system",
                 "message": f"ようこそ {name} さん！役職: {role}",
+                **self.get_phase_info(),
             },
         )
 
@@ -173,12 +193,117 @@ class WerewolfServer:
                     removed.add(ws)
             self.godview_clients -= removed
 
+    def get_time_remaining(self) -> int:
+        """残り時間（秒）を取得"""
+        if self.phase_start_time is None:
+            return 0
+        elapsed = (datetime.now() - self.phase_start_time).total_seconds()
+        remaining = max(0, self.phase_duration - elapsed)
+        return int(remaining)
+
+    def get_phase_info(self) -> dict:
+        """現在のフェーズ情報を取得"""
+        return {
+            "current_phase": self.game_phase,
+            "time_remaining": self.get_time_remaining(),
+        }
+
+    async def start_phase_timer(self, phase: str, duration: int):
+        """フェーズタイマーを開始"""
+        # 既存のタイマーをキャンセル
+        if self.phase_timer_task and not self.phase_timer_task.done():
+            self.phase_timer_task.cancel()
+
+        async def phase_timer():
+            try:
+                await asyncio.sleep(duration)
+                await self.next_phase()
+            except asyncio.CancelledError:
+                pass
+
+        self.game_phase = phase
+        self.phase_start_time = datetime.now()
+        self.phase_duration = duration
+        self.phase_timer_task = asyncio.create_task(phase_timer())
+
+        print(f"⏱️  フェーズ開始: {phase} ({duration}秒)")
+
+    async def next_phase(self):
+        """次のフェーズへ遷移"""
+        phase_transitions = {
+            "waiting": "introduction",
+            "introduction": "discussion",
+            "discussion": "voting",
+            "voting": "werewolf",
+            "werewolf": "seer",
+            "seer": "day_end",
+            "day_end": "discussion",
+        }
+
+        next_phase = phase_transitions.get(self.game_phase, "discussion")
+        await self.change_phase(next_phase)
+
+    async def change_phase(self, new_phase: str):
+        """フェーズを変更し、システム通知を送信"""
+        old_phase = self.game_phase
+        self.game_phase = new_phase
+        duration = self.phase_durations.get(new_phase, 60)
+
+        # フェーズ開始メッセージ
+        phase_messages = {
+            "introduction": "🐺 **ゲーム開始！**\n\nまずは自己紹介をお願いします。\n各自、名前と簡単な挨拶をしてください。",
+            "discussion": "💬 **議論フェーズ**\n\n自由に議論してください。\n人狼を見つけ出しましょう！",
+            "voting": "🗳️ **投票フェーズ**\n\n投票してください！\n襲撃対象を選んでください。",
+            "werewolf": "🐺 **人狼フェーズ**\n\n人狼の人は襲撃対象を選んでください。",
+            "seer": "🔮 **占いフェーズ**\n\n占い師は占い対象を選んでください。",
+            "day_end": "☀️ **朝になりました**\n\n昨夜の結果を発表します。",
+        }
+
+        # メッセージを取得
+        message = phase_messages.get(new_phase, f"フェーズ: {new_phase}")
+
+        # システム通知を送信
+        if new_phase == "werewolf":
+            # 人狼のみ
+            await self.send_to_role("werewolf", message)
+        elif new_phase == "seer":
+            # 占い師のみ
+            await self.send_to_role("seer", message)
+        else:
+            # 全員
+            await self.broadcast_to_channel(
+                "public",
+                {
+                    "type": "system",
+                    "content": message,
+                    **self.get_phase_info(),
+                },
+            )
+
+        # タイマーを開始（day_end 以外）
+        if new_phase != "waiting" and new_phase != "day_end":
+            await self.start_phase_timer(new_phase, duration)
+
+    async def send_to_role(self, role: str, message: dict):
+        """特定の役職のプレイヤーにメッセージを送信"""
+        for player in self.players.values():
+            if player.role == role:
+                await self.send_to_player(
+                    player.id,
+                    {
+                        **message,
+                        **self.get_phase_info(),
+                    },
+                )
+
     async def start_game(self):
         """ゲームを開始し、全プレイヤーに挨拶と説明を送信"""
         welcome_message = """
 🐺 **人狼ゲームへようこそ！**
 
-私はこのゲームのゲームマスターです。
+このゲームはサーバー側で自動進行します。
+各フェーズに制限時間があり、時間が切れると自動的に次のフェーズに遷移します。
+
 皆さんが役職を持ち、村人チームと人狼チームに分かれて対戦します。
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━
@@ -207,7 +332,7 @@ class WerewolfServer:
 ━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 それでは、まずは自己紹介をお願いします。
-自分の名前と、（役職がわかるなら）簡単な挨拶をしてください。
+自分の名前と、（役職がわかるなら）簡単な挨拧をしてください。
 """
 
         await self.broadcast_to_channel(
@@ -215,11 +340,14 @@ class WerewolfServer:
             {
                 "type": "system",
                 "content": welcome_message.strip(),
-                "phase": "introduction",
+                **self.get_phase_info(),
             },
         )
 
         print("🎮 ゲームを開始しました - 挨拶メッセージを送信しました")
+
+        # 自動的に introduction フェーズを開始
+        await self.change_phase("introduction")
 
     async def handle_message(self, player_id: str, message: dict, websocket=None):
         """プレイヤーからのメッセージを処理"""
@@ -263,6 +391,7 @@ class WerewolfServer:
                         "type": "history",
                         "channel": channel,
                         "messages": recent_messages,
+                        **self.get_phase_info(),
                     }))
 
         elif msg_type == "action":
@@ -345,6 +474,7 @@ class WerewolfServer:
                             "type": "history",
                             "channel": channel,
                             "messages": messages,
+                            **self.get_phase_info(),
                         }))
                         print(f"📜 過去ログ送信: {channel} ({len(messages)}件)")
                     else:
@@ -352,6 +482,15 @@ class WerewolfServer:
                             "type": "error",
                             "message": f"チャンネル '{channel}' が見つかりません"
                         }))
+                    return
+
+                elif client_type == "get_time_remaining":
+                    # 残り時間取得コマンド
+                    await websocket.send(json.dumps({
+                        "type": "time_remaining",
+                        **self.get_phase_info(),
+                    }))
+                    print(f"⏱️  残り時間送信: {self.game_phase} ({self.get_time_remaining()}秒)")
                     return
 
                 elif client_type == "godview":
@@ -384,6 +523,7 @@ class WerewolfServer:
                                     }
                                     for name, ch in self.channels.items()
                                 },
+                                **self.get_phase_info(),
                             }
                         )
                     )
