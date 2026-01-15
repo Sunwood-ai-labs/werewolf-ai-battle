@@ -68,6 +68,29 @@ class WerewolfServer:
         self, websocket, player_id: str, name: str, role: str = "villager"
     ):
         """プレイヤーを登録"""
+
+        # 名前の重複チェック（先にチェックする）
+        for pid, p in self.players.items():
+            if p.name == name:
+                # 同じplayer_idで、同じ名前なら再接続として許可
+                if pid == player_id:
+                    # 既存の接続を閉じる
+                    if p.websocket and p.websocket != websocket:
+                        try:
+                            await p.websocket.close()
+                        except:
+                            pass
+                    print(f"⚠️  プレイヤー再接続: {name} (既存の接続を置き換え)")
+                    break
+                else:
+                    # 異なるplayer_idで同じ名前ならエラー
+                    await websocket.send(json.dumps({
+                        "type": "error",
+                        "message": f"プレイヤー名 '{name}' は既に使用されています"
+                    }))
+                    print(f"❌ 登録エラー: 名前 '{name}' は既に使用中 (player_id: {pid})")
+                    return None
+
         player = Player(player_id, name, role)
         player.websocket = websocket
 
@@ -198,7 +221,7 @@ class WerewolfServer:
 
         print("🎮 ゲームを開始しました - 挨拶メッセージを送信しました")
 
-    async def handle_message(self, player_id: str, message: dict):
+    async def handle_message(self, player_id: str, message: dict, websocket=None):
         """プレイヤーからのメッセージを処理"""
         msg_type = message.get("type")
 
@@ -206,10 +229,19 @@ class WerewolfServer:
             # チャットメッセージ
             channel = message.get("channel", "public")
             content = message.get("content", "")
+            sender_name = message.get("name")  # メッセージ内の名前を取得
 
+            # player_id からプレイヤーを探す
             player = self.players.get(player_id)
             if not player:
-                return
+                # player_id がない場合、name から探す
+                if sender_name:
+                    for p in self.players.values():
+                        if p.name == sender_name:
+                            player = p
+                            break
+                if not player:
+                    return
 
             chat_message = {
                 "type": "chat",
@@ -221,6 +253,18 @@ class WerewolfServer:
 
             await self.broadcast_to_channel(channel, chat_message)
 
+            # websocket があれば過去ログを返す
+            if websocket:
+                channel_obj = self.channels.get(channel)
+                if channel_obj:
+                    # 最新10件を返す
+                    recent_messages = channel_obj.messages[-10:]
+                    await websocket.send(json.dumps({
+                        "type": "history",
+                        "channel": channel,
+                        "messages": recent_messages,
+                    }))
+
         elif msg_type == "action":
             # ゲームアクション（投票、襲撃など）
             await self.broadcast_godview(
@@ -229,6 +273,9 @@ class WerewolfServer:
 
     async def handle_client(self, websocket):
         """クライアント接続を処理"""
+        client_type = None
+        player_id = None
+
         try:
             async for message in websocket:
                 data = json.loads(message)
@@ -246,15 +293,78 @@ class WerewolfServer:
                         websocket, player_id, name, role
                     )
 
+                    # 登録に失敗した場合（重複など）
+                    if player is None:
+                        return
+
                     # メインループ
                     async for msg in websocket:
                         try:
                             msg_data = json.loads(msg)
-                            await self.handle_message(player.id, msg_data)
+                            await self.handle_message(player.id, msg_data, websocket)
                         except:
                             pass
 
+                elif client_type == "chat":
+                    # チャットメッセージ（name からプレイヤーを探す）
+                    sender_name = data.get("name")
+                    if sender_name:
+                        # 名前からプレイヤーを探す
+                        player = None
+                        for p in self.players.values():
+                            if p.name == sender_name:
+                                player = p
+                                break
+
+                        if player:
+                            await self.handle_message(player.id, data, websocket)
+                            # メッセージを送ったら接続を閉じる（websocat対応）
+                            return
+                        else:
+                            await websocket.send(json.dumps({
+                                "type": "error",
+                                "message": f"プレイヤー '{sender_name}' が見つかりません"
+                            }))
+                            print(f"❌ チャットエラー: プレイヤー '{sender_name}' が見つかりません")
+                    else:
+                        await websocket.send(json.dumps({
+                            "type": "error",
+                            "message": "チャットメッセージには 'name' フィールドが必要です"
+                        }))
+                        print("❌ チャットエラー: name フィールドがない")
+
+                elif client_type == "get_history":
+                    # 過去ログ取得コマンド
+                    channel = data.get("channel", "public")
+                    count = data.get("count", 10)  # デフォルト10件
+
+                    channel_obj = self.channels.get(channel)
+                    if channel_obj:
+                        messages = channel_obj.messages[-count:] if count > 0 else channel_obj.messages
+                        await websocket.send(json.dumps({
+                            "type": "history",
+                            "channel": channel,
+                            "messages": messages,
+                        }))
+                        print(f"📜 過去ログ送信: {channel} ({len(messages)}件)")
+                    else:
+                        await websocket.send(json.dumps({
+                            "type": "error",
+                            "message": f"チャンネル '{channel}' が見つかりません"
+                        }))
+                    return
+
                 elif client_type == "godview":
+                    # パスワードチェック
+                    password = data.get("password")
+                    if password != "wolf":
+                        await websocket.send(json.dumps({
+                            "type": "error",
+                            "message": "パスワードが違います"
+                        }))
+                        print("❌ Godview接続エラー: パスワードが違います")
+                        return
+
                     # 神視点クライアント
                     self.godview_clients.add(websocket)
 
@@ -298,9 +408,7 @@ class WerewolfServer:
             # クリーンアップ
             if client_type == "godview":
                 self.godview_clients.discard(websocket)
-            else:
-                # プレイヤーの削除はregister時に判定が必要
-                pass
+            # プレイヤーは削除しない（再接続できるように）
 
     async def start(self):
         """サーバーを起動"""
