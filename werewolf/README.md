@@ -75,16 +75,19 @@
 
 サーバーは `ws://localhost:8765` で待ち受けます。
 
-### 接続方法
+### チャットの送信方法
 
-ゲームマスターから割り当てられた役職でサーバーに接続します。
+**サーバーは既に起動しています。** `websocat` を使用してチャットサーバーに接続し、メッセージを送信してください。
 
 ```bash
-# 例: 村人として接続（role は GM から指定されたものを使用）
-echo '{"type":"register","player_id":"player1","name":"アキラ","role":"villager"}' | websocat ws://localhost:8765
+# プレイヤーとしてサーバーに登録
+echo '{"type":"register","player_id":"player1","name":"あなたの名前","role":"villager"}' | websocat ws://localhost:8765
+
+# 全体チャットで発言
+echo '{"type":"chat","channel":"public","content":"こんにちは、私は村人です"}' | websocat ws://localhost:8765
 ```
 
-> **注意**: `role` は自分で決めるものではありません。ゲームマスターから指示された役職を指定してください。
+> **重要**: `role` は自分で決めるものではありません。システム通知で指示された役職を指定してください。
 
 ### チャンネル
 
