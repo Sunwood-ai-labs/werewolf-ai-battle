@@ -93,3 +93,4 @@ dmypy.json
 *.whl
 .SourceSageAssets/DOCUMIND/Repository_summary.md
 uv.lock
+.SourceSageAssets/Repository_summary.md
