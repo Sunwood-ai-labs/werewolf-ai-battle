@@ -77,17 +77,43 @@
 
 ### チャットの送信方法
 
-**サーバーは既に起動しています。** `websocat` を使用してチャットサーバーに接続し、メッセージを送信してください。
+**サーバーは既に起動しています。** まずプレイヤー登録をしてから、チャットを送信してください。
+
+#### 方法1: websocat（1回ずつ送信）
 
 ```bash
-# プレイヤーとしてサーバーに登録
+# 1. プレイヤー登録
 echo '{"type":"register","player_id":"player1","name":"あなたの名前","role":"villager"}' | websocat ws://localhost:8765
 
-# 全体チャットで発言
-echo '{"type":"chat","channel":"public","content":"こんにちは、私は村人です"}' | websocat ws://localhost:8765
+# 2. チャット送信（nameパラメータでプレイヤーを特定）
+echo '{"type":"chat","name":"あなたの名前","channel":"public","content":"こんにちは、私は村人です"}' | websocat ws://localhost:8765
+
+# 3. さらにチャットを送信
+echo '{"type":"chat","name":"あなたの名前","channel":"public","content":"人狼だと思う人は誰ですか？"}' | websocat ws://localhost:8765
 ```
 
-> **重要**: `role` は自分で決めるものではありません。システム通知で指示された役職を指定してください。
+> **重要**: チャットを送信するには、**必ず `name` パラメータを含めてください**。サーバーが `name` からプレイヤーを特定してメッセージを処理します。
+
+#### 方法2: websocat（対話モード）
+
+```bash
+# 対話モードで接続
+websocat -n ws://localhost:8765
+
+# その後、対話的にメッセージを送信
+{"type":"register","player_id":"player1","name":"あなたの名前","role":"villager"}
+{"type":"chat","channel":"public","content":"こんにちは、私は村人です"}
+```
+
+対話モードでは、最初の登録時に接続が維持されるため、チャットメッセージに `name` を含める必要はありません。
+
+#### テストスクリプト
+
+```bash
+# テストスクリプトを実行
+cd /home/aslan/aslan_prj/zero-cc/ZERO_CC_PRJ/werewolf-ai-battle
+uv run python tests/test_chat.py
+```
 
 ### チャンネル
 
@@ -115,14 +141,43 @@ echo '{"type":"chat","channel":"public","content":"こんにちは、私は村�
 ```json
 {
   "type": "chat",
+  "name": "あなたの名前",
   "channel": "public|werewolf|moderator",
   "content": "メッセージ内容"
 }
 ```
 
+> **重要**: `name` パラメータは必須です。サーバーが `name` からプレイヤーを特定してメッセージを処理します。1回きりの接続（echo + websocat）でも、同じ名前で登録済みならチャットを送信できます。
+
 **例**:
-- 全体チャット: `{"type": "chat", "channel": "public", "content": "私は人狼ではないと思います"}`
-- 人狼チャット（人狼のみ）: `{"type": "chat", "channel": "werewolf", "content": "今夜はプレイヤー2を襲撃しましょう"}`
+- 全体チャット: `{"type": "chat", "name": "アキラ", "channel": "public", "content": "私は人狼ではないと思います"}`
+- 人狼チャット（人狼のみ）: `{"type": "chat", "name": "ハルト", "channel": "werewolf", "content": "今夜はプレイヤー2を襲撃しましょう"}`
+
+> **ヒント**: チャット送信後に、最新10件の過去ログが自動的に返されます。
+
+#### 過去ログ取得
+
+チャットを送信せずに、過去ログだけを取得したい場合は `get_history` コマンドを使用します。
+
+```json
+{
+  "type": "get_history",
+  "channel": "public|werewolf|moderator",
+  "count": 10
+}
+```
+
+- `channel`: 取得するチャンネル名（省略時は `public`）
+- `count`: 取得する件数（省略時は10件、0で全件）
+
+**例**:
+```bash
+# 最新10件を取得
+echo '{"type":"get_history","channel":"public","count":10}' | websocat ws://localhost:8765
+
+# 全件を取得
+echo '{"type":"get_history","channel":"public","count":0}' | websocat ws://localhost:8765
+```
 
 #### ゲームアクション（投票、襲撃など）
 
