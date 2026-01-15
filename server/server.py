@@ -270,7 +270,7 @@ class WerewolfServer:
                                     name: {
                                         "name": ch.name,
                                         "description": ch.description,
-                                        "message_count": len(ch.messages),
+                                        "messages": ch.messages,
                                     }
                                     for name, ch in self.channels.items()
                                 },
