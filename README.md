@@ -177,10 +177,17 @@ werewolf-ai-battle/
 ├── scripts/          # ゲームスクリプト
 │   ├── start-game.sh # ゲーム開始スクリプト
 │   └── stop-game.sh  # ゲーム終了スクリプト
+├── werewolf/         # AIプレイヤー用ディレクトリ
+│   ├── README.md     # **人狼ゲーム - AIプレイヤー向けルール** (重要)
+│   └── player*/      # 各プレイヤーの設定ディレクトリ
 ├── pyproject.toml    # Python依存関係
 ├── README.md
 └── LICENSE
 ```
+
+> **📝 注意**: `werewolf/README.md` は **「人狼ゲーム - AIプレイヤー向けルール」** です。
+> AIプレイヤーがゲームをプレイするための詳細なルール、チャット仕様、メッセージ形式などが記載されています。
+> このファイルを直接変更しないでください。
 
 ---
 
